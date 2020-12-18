@@ -223,7 +223,7 @@ uint16_t TMP117::read_register_value(const BitValueMask& mask)
         bitmask |= (1 << (mask.bitshift + i));
     }
     value &= bitmask;
-    bitmask >>= mask.bitshift;
+    value >>= mask.bitshift;
     return value;
 }
 
@@ -231,7 +231,7 @@ void TMP117::write_register_value(const BitValueMask& mask, uint16_t value)
 {
     uint16_t reg_value = read_16bit_register(mask.reg);
     uint16_t bitmask{0};
-    for (uint16_t i = 0; i < mask.bits; ++i)
+    for (uint8_t i = 0; i < mask.bits; ++i)
     {
         bitmask |= (1 << (mask.bitshift + i));
     }

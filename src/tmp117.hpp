@@ -8,10 +8,23 @@
 #ifndef TMP117_HPP
 #define TMP117_HPP
 
-#include "drivers/I2C.h"
-#include <math.h>
+#define BYTE_PLACEHOLDER "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BIN(byte) \
+  (byte & 0x80 ? '1' : '0'), \
+  (byte & 0x40 ? '1' : '0'), \
+  (byte & 0x20 ? '1' : '0'), \
+  (byte & 0x10 ? '1' : '0'), \
+  (byte & 0x08 ? '1' : '0'), \
+  (byte & 0x04 ? '1' : '0'), \
+  (byte & 0x02 ? '1' : '0'), \
+  (byte & 0x01 ? '1' : '0') 
 
-// #include "mbed_trace.h"
+#include "drivers/I2C.h"
+#include "drivers/InterruptIn.h"
+#include "platform/Callback.h"
+#include "mbed_error.h"
+#include <math.h>
+#include <memory>
 
 #ifdef MBED_CONF_TMP117_ENABLE_DEBUG_MODE
 #endif
@@ -25,8 +38,6 @@ public:
     {
         CONVERSION_TIME
     };
-
-    
 
     /*  Conversion Cycle Time in CC Mode
               AVG       0       1       2       3
@@ -76,28 +87,28 @@ public:
         AVG_MODE_64_SAMPLES             = 0x03,
     };
 
-    private: enum ALERT_MODE_SEL
+    public: enum ALERT_MODE
     {
-        ALERT_MODE_SEL_ALERT            = 0x00,
-        ALERT_MODE_SEL_THERM            = 0x01,
+        ALERT_MODE_ALERT                = 0x00,
+        ALERT_MODE_THERM                = 0x01,
     }; 
 
-    public: enum ALERT_PIN_POLARITY
+    public: enum OUTPUT_PIN_POLARITY
     {
         ALERT_PIN_POL_ACTIVE_LOW        = 0x00,
-        ALERT_PIN_POL_ACTIVE_HIGH       = 0x01,   
+        OUTPUT_PIN_POL_ACTIVE_HIGH      = 0x01,   
     };
 
-    public: enum PIN_OUTPUT_SEL
+    public: enum OUTPUT_PIN_MODE
     {
-        PIN_OUTPUT_SEL_ALERT            = 0x00,
-        PIN_OUTPUT_SEL_DATA_READY       = 0x01,
+        OUTPUT_PIN_MODE_ALERT            = 0x00,
+        OUTPUT_PIN_MODE_DATA_READY       = 0x01,
     };
 
     private: enum EEPROM_STATE
     {
-        EEPROM_STATE_UNLOCKED           = 0x00,
-        EEPROM_STATE_LOCKED             = 0x01,
+        EEPROM_STATE_LOCKED               = 0x00,
+        EEPROM_STATE_UNLOCKED             = 0x01,
     };
 
 private:
@@ -123,10 +134,18 @@ public:
 
     TMP117(
         PinName sda = MBED_CONF_TMP117_SDA_PIN, 
-        PinName scl = MBED_CONF_TMP117_SCL_PIN, 
-        PinName alert_pin = MBED_CONF_TMP117_ALERT_PIN,
-        uint32_t frequency = 400000);
+        PinName scl = MBED_CONF_TMP117_SCL_PIN,
+        uint32_t frequency = MBED_CONF_TMP117_FREQUENCY);
     ~TMP117() = default;
+
+    /**
+     * @brief           
+     */
+    void set_output_pin_interrupt(
+        OUTPUT_PIN_MODE mode,
+        OUTPUT_PIN_POLARITY polarity,
+        mbed::Callback<void()>& cb,
+        PinName alert_pin = MBED_CONF_TMP117_OUTPUT_PIN);
 
     /**
      * @brief           configures the device into therm mode
@@ -137,10 +156,16 @@ public:
 
     /**
      * @brief           configures the device into alert mode
-     *                  The alert flag is cleared when the conversion result is read
+     *                  The alert flag is set when the temp goes above or below the given limits and 
+     *                  is cleared when the conversion result or low/high alert status is read
      * @return          void              
      */
     void set_alert_mode(void);
+
+    /**
+     * 
+     */
+    ALERT_MODE get_alert_mode(void);
 
     /**
      * @brief           Reads out high and low alert flags als well as data ready flag
@@ -150,11 +175,11 @@ public:
 
     /**
      * @brief           Selects the ALERT pin to either function as data ready or alert output
-     * @param select    PIN_SEL_ALERT_OUTPUT: pin reflects status of alert flag
+     * @param mode      PIN_SEL_ALERT_OUTPUT: pin reflects status of alert flag
      *                  PIN_SEL_DATA_READY_OUTPUT: pin reflects status of data ready flag
      * @return          void          
      */
-    void set_pin_output(PIN_OUTPUT_SEL select);
+    void set_output_pin_mode(OUTPUT_PIN_MODE mode);
 
     /**
      * @brief           Runs the power-on reset sequence
@@ -171,13 +196,17 @@ public:
     void set_offset_temperature(float offset);
 
     /**
-     * @brief           Polarity (high or low) of alert pin
+     * @brief           Polarity (high or low) of alert/output pin
      * @param polarity  high or low polarity
      * @return          void
      */
-    void set_alert_pin_polarity(ALERT_PIN_POLARITY polarity);
+    void set_output_pin_polarity(OUTPUT_PIN_POLARITY polarity);
 
-    ALERT_PIN_POLARITY get_alert_pin_polarity(void);
+    /**
+     * @brief           Returns the current polarity of the alert/output pin
+     * @return          Polarity of the pin (0/1)
+     */
+    OUTPUT_PIN_POLARITY get_alert_pin_polarity(void);
 
     /**
      * @brief           Gets the offset temperture
@@ -219,7 +248,9 @@ public:
      * @brief           Unlocks the eeprom so data can be programmed to the EEPROM
      * @return          void
      */
-    void unlock_registers(void);
+    uint16_t unlock_registers(void);
+
+    bool registers_unlocked();
 
     /**
      * @brief           Forces the device into shut down mode (250nA QC)
@@ -275,15 +306,22 @@ public:
 
     /**
      * @brief               Sets the upper and lower alert limit
-     * @param lower_limit   The lower alert limit
-     * @param upper_limit   The upper alert limit   
+     * @param lower_limit   The lower alert limit in °C
+     * @param upper_limit   The upper alert limit in °C
      * @return              void
      */
-    void set_alert_temperature(const float lower_limit, const float upper_limit);
+    void set_alert_limits(const float lower_limit, const float upper_limit);
+
+    void get_alert_limits(float& lower_limit, float& upper_limit);
 
     // TODO: hard_reset
 
 private:
+
+    /**
+     * @brief TODO timer
+     */
+    void wait_ready();
 
     bool is_busy(void);
 
@@ -308,14 +346,16 @@ private:
     //template<class Enum>
     //void write_register_value(Element<Enum>& cycle, uint16_t value);
 
-    void write_register_value(const BitValueMask& mask, uint16_t value);
-    uint16_t read_register_value(const BitValueMask& mask);
+    uint16_t write_value(const BitValueMask& mask, uint16_t value);
+    uint16_t read_value(const BitValueMask& mask);
 
 private:
 
     mbed::I2C _i2c;                                     // <I2C interface>
+    std::unique_ptr<mbed::InterruptIn> _isr;
+
     static constexpr float TMP_PER_BIT = 0.0078125f;    // <Temperature in K per bit>
-    static constexpr uint16_t DEVICE_ADDRESS = 0x48;    // <Device I2C address>
+    static constexpr uint16_t DEVICE_ADDRESS = 0x90;    // <Device I2C address>
 
     static constexpr uint16_t EEPROM_STATE_BUSY        = 0x01;
     static constexpr uint16_t SOFT_RESET               = 0x01;
@@ -324,16 +364,14 @@ private:
     static constexpr uint16_t REG_CONFIG               = 0x01;
     static constexpr uint16_t REG_TEMP_HIGH_LIMIT      = 0x02;
     static constexpr uint16_t REG_TEMP_LOW_LIMIT       = 0x03;
-    static constexpr uint16_t REG_EEPROM_UNLOCK        = 0x04;
+    static constexpr uint16_t REG_EEPROM_UNLOCK        = 0x04; // <default: 0x00>
     static constexpr uint16_t REG_EEPROM1              = 0x05;
     static constexpr uint16_t REG_EEPROM2              = 0x06;
     static constexpr uint16_t REG_EEPROM3              = 0x08;
     static constexpr uint16_t REG_TEMP_OFFSET          = 0x07;
     static constexpr uint16_t REG_DEVICE_ID            = 0x0F;
     
-    /**
-     * CONFIGURATION REGISTER (0x01)
-     */
+    // CONFIGURATION REGISTER (0x01)
     const BitValueMask _conv_info_mask      {REG_CONFIG, 3, 13};
     const BitValueMask _conv_mode_mask      {REG_CONFIG, 2, 10};
     const BitValueMask _conv_cycle_mask     {REG_CONFIG, 3, 7 };
@@ -343,15 +381,11 @@ private:
     const BitValueMask _alert_pin_sel_mask  {REG_CONFIG, 1, 2 };
     const BitValueMask _soft_reset_mask     {REG_CONFIG, 1, 1 };
 
-    /**
-     * EEPROM UNLOCK REGISTER (0x04)
-     */
+    // EEPROM UNLOCK REGISTER (0x04)
     const BitValueMask _eun_mask            {REG_EEPROM_UNLOCK, 1, 15};
     const BitValueMask _eeprom_busy_mask    {REG_EEPROM_UNLOCK, 1, 14};
 
-    /**
-     * DEVICE ID REGISTER (0x0F)
-     */
+    // DEVICE ID REGISTER (0x0F)
     const BitValueMask _device_rev_mask     {REG_DEVICE_ID, 3, 12};
     const BitValueMask _device_id_mask      {REG_DEVICE_ID, 15, 0};
 

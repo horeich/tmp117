@@ -9,13 +9,18 @@
             "help": "the scl pin of the I2C communication",
             "value": "PB_8"
         },
-        "alert-pin": {
+        "output-pin": {
             "help": "configurable altert/data ready pin",
             "value": "PC_7"
         },
         "enable-debug-mode": {
             "help": "enable debug mode",
             "value": true
+        },
+        "frequency":
+        {
+            "help": "the desired I2C frequency",
+            "value": 400000
         }
     }
 }

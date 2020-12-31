@@ -301,23 +301,6 @@ public:
      */
     void get_alert_limits(float& lower_limit, float& upper_limit);
 
-private:
-
-    /**
-     * @brief           Selects the ALERT pin to either function as data ready or alert output
-     * @param mode      OUTPUT_PIN_MODE: pin reflects status of alert flag
-     *                  or pin reflects status of data ready flag
-     * @return          void          
-     */
-    void set_output_pin_mode(OUTPUT_PIN_MODE mode);
-
-    /**
-     * @brief           Polarity (high or low) of alert/output pin
-     * @param polarity  high or low polarity
-     * @return          void
-     */
-    void set_output_pin_polarity(OUTPUT_PIN_POLARITY polarity);
-
     /**
      * @brief           Locks the EEPROM so data cannot be programmed to the EEPROM
      * @return          void
@@ -335,6 +318,23 @@ private:
      * @return          true if unlocked, false if locked
      */
     bool registers_unlocked();
+
+private:
+
+    /**
+     * @brief           Selects the ALERT pin to either function as data ready or alert output
+     * @param mode      OUTPUT_PIN_MODE: pin reflects status of alert flag
+     *                  or pin reflects status of data ready flag
+     * @return          void          
+     */
+    void set_output_pin_mode(OUTPUT_PIN_MODE mode);
+
+    /**
+     * @brief           Polarity (high or low) of alert/output pin
+     * @param polarity  high or low polarity
+     * @return          void
+     */
+    void set_output_pin_polarity(OUTPUT_PIN_POLARITY polarity);
 
     void wait_ready();
 

@@ -165,6 +165,7 @@ void TMP117::soft_reset()
 void TMP117::i2c_reset()
 {
     char reset = I2C_RESET;
+    //_i2c.write(0x00, &reset, 1);
     write_register(0x00, &reset, 1);
 }
 
@@ -181,6 +182,25 @@ uint16_t TMP117::get_device_id()
 uint8_t TMP117::get_device_revision()
 {
     return static_cast<uint8_t>(read_value(_device_rev_mask));
+}
+
+void TMP117::lock_registers()
+{
+    printf("TMP117::%s\n", __func__);
+    write_value(_eun_mask, EEPROM_STATE_LOCKED);
+    wait_ready();
+}
+
+void TMP117::unlock_registers()
+{
+    printf("TMP117::%s\n", __func__);
+    write_value(_eun_mask, EEPROM_STATE_UNLOCKED);
+    wait_ready();
+}
+
+bool TMP117::registers_unlocked()
+{
+    return static_cast<bool>(read_value(_eun_mask));
 }
 
 // Private
@@ -205,25 +225,6 @@ void TMP117::wait_ready()
 bool TMP117::is_busy()
 {
     return static_cast<bool>(read_value(_eeprom_busy_mask));
-}
-
-void TMP117::lock_registers()
-{
-    printf("TMP117::%s\n", __func__);
-    write_value(_eun_mask, EEPROM_STATE_LOCKED);
-    wait_ready();
-}
-
-void TMP117::unlock_registers()
-{
-    printf("TMP117::%s\n", __func__);
-    write_value(_eun_mask, EEPROM_STATE_UNLOCKED);
-    wait_ready();
-}
-
-bool TMP117::registers_unlocked()
-{
-    return static_cast<bool>(read_value(_eun_mask));
 }
 
 void TMP117::read_register(char reg, char* data, int size)

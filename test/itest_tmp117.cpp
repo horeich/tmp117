@@ -33,7 +33,7 @@ void tearDown(void)
 void test_set_one_shot_conversion_mode()
 {
     _device->set_oneshot_conversion_mode();
-    TEST_ASSERT_EQUAL_UINT16(TMP117::CONVERSION_MODE_SHUTDOWN, _device->get_conversion_mode()); // note: will start up in shutdown mode
+    TEST_ASSERT_EQUAL_UINT16(TMP117::CONVERSION_MODE_ONESHOT, _device->get_conversion_mode());
 }
 
 void test_set_continuous_conversion_mode()
@@ -74,9 +74,22 @@ void test_set_alert_mode()
 
 void test_soft_reset()
 {
+    _device->unlock_registers();
     _device->set_therm_mode();
+    _device->lock_registers();
+    _device->set_alert_mode();
     _device->soft_reset();
-    TEST_ASSERT_EQUAL_UINT16(TMP117::ALERT_MODE_ALERT, _device->get_alert_mode());
+    TEST_ASSERT_EQUAL_UINT16(TMP117::ALERT_MODE_THERM, _device->get_alert_mode());
+}
+
+void test_i2c_reset()
+{
+    _device->unlock_registers();
+    _device->set_therm_mode();
+    _device->lock_registers();
+    _device->set_alert_mode();
+    _device->i2c_reset();
+    TEST_ASSERT_EQUAL_UINT16(TMP117::ALERT_MODE_THERM, _device->get_alert_mode());
 }
 
 void test_set_output_pin_interrupt()
@@ -142,6 +155,8 @@ void run_itest_tmp117()
     RUN_TEST(test_set_alert_mode);
 
     RUN_TEST(test_soft_reset);
+
+    RUN_TEST(test_i2c_reset);
     
 
 

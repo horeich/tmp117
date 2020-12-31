@@ -1,7 +1,7 @@
 /**
  * @file    TMP117.cpp
  * @author  Andreas Reichle (HOREICH UG)
-*/
+ */
 
 #include "tmp117.hpp"
 
@@ -14,13 +14,14 @@ TMP117::TMP117(PinName sda, PinName scl, uint32_t frequency) :
 void TMP117::set_output_pin_interrupt(
     OUTPUT_PIN_MODE mode, 
     OUTPUT_PIN_POLARITY polarity, 
-    mbed::Callback<void()>& cb, 
+    mbed::Callback<void()> cb, 
     PinName output_pin)
 {
-    set_output_pin_mode(mode);
-    set_output_pin_polarity(polarity);
-    if (output_pin != PinName::NC)
+    printf("TMP117::%s\n", __func__);
+    if (cb)
     {
+        set_output_pin_mode(mode);
+        set_output_pin_polarity(polarity);
         _isr = std::make_unique<mbed::InterruptIn>(output_pin, PinMode::PullNone);
         if (polarity == OUTPUT_PIN_POL_ACTIVE_HIGH)
         {
@@ -39,12 +40,12 @@ void TMP117::set_output_pin_interrupt(
 
 float TMP117::read_temperature()
 {
-    return read_16bit_register(REG_TEMP) * TMP_PER_BIT;
+    return static_cast<short>(read_16bit_register(REG_TEMP)) * TMP_PER_BIT;
 }
 
-TMP117::STATE TMP117::get_conversion_info()
+TMP117::STATE TMP117::get_conversion_state()
 {
-    return (STATE)read_value(_conv_info_mask);
+    return (STATE)read_value(_conv_state_mask);
 }
 
 uint16_t TMP117::get_device_address()
@@ -59,49 +60,55 @@ void TMP117::shut_down()
 
 void TMP117::set_continuous_conversion_mode()
 {
+    printf("TMP117::%s\n", __func__);
     write_value(_conv_mode_mask, CONVERSION_MODE_CONTINUOUS);
+    wait_ready();
 }
 
 void TMP117::set_oneshot_conversion_mode()
 {
+    printf("TMP117::%s\n", __func__);
     write_value(_conv_mode_mask, CONVERSION_MODE_ONESHOT);
+    //wait_ready();
 }
 
 TMP117::CONVERSION_MODE TMP117::get_conversion_mode()
 {
-    return (CONVERSION_MODE)read_value(_alert_mode_sel);
+    return static_cast<CONVERSION_MODE>(read_value(_conv_mode_mask));
 }
 
 void TMP117::set_conversion_cycle_time(CONV_CYCLE cycle)
 {
+    printf("TMP117::%s\n", __func__);
     write_value(_conv_cycle_mask, cycle);
+    wait_ready();
 }
 
 TMP117::CONV_CYCLE TMP117::get_conversion_cycle_time()
 {
-    return (CONV_CYCLE)read_value(_conv_cycle_mask);
+    return static_cast<CONV_CYCLE>(read_value(_conv_cycle_mask));
 }
 
 void TMP117::set_averaging_mode(AVG_MODE mode)
 {
+    printf("TMP117::%s\n", __func__);
     write_value(_avg_mask, mode);
+    wait_ready();
 }
 
 TMP117::AVG_MODE TMP117::get_averaging_mode()
 {
-    return (AVG_MODE)read_value(_avg_mask);
+    return static_cast<AVG_MODE>(read_value(_avg_mask));
 }
 
 void TMP117::set_alert_limits(const float lower_limit, const float upper_limit)
 {
     MBED_ASSERT(lower_limit < upper_limit);
-    MBED_ASSERT(lower_limit >= -256.0f);
-    MBED_ASSERT(upper_limit <= 256.0f); // TODO: correct value?
+    MBED_ASSERT(lower_limit >= MIN_TEMPERATURE);
+    MBED_ASSERT(upper_limit <= MAX_TEMPERATURE);
 
-    uint16_t lower_limit_steps = roundf(lower_limit / TMP_PER_BIT);
-    uint16_t upper_limit_steps = roundf(upper_limit / TMP_PER_BIT); 
-
-    printf("lower steps: %d, upper steps: %d\n", lower_limit_steps, upper_limit_steps);
+    short lower_limit_steps = roundf(lower_limit / TMP_PER_BIT);
+    short upper_limit_steps = roundf(upper_limit / TMP_PER_BIT); 
 
     write_16bit_register(REG_TEMP_LOW_LIMIT, lower_limit_steps);
     wait_ready();
@@ -111,18 +118,19 @@ void TMP117::set_alert_limits(const float lower_limit, const float upper_limit)
 
 void TMP117::get_alert_limits(float& lower_limit, float& upper_limit)
 {
-    lower_limit = read_16bit_register(REG_TEMP_LOW_LIMIT) * TMP_PER_BIT;
-    upper_limit = read_16bit_register(REG_TEMP_HIGH_LIMIT) * TMP_PER_BIT;
+    lower_limit = static_cast<short>(read_16bit_register(REG_TEMP_LOW_LIMIT)) * TMP_PER_BIT;
+    upper_limit = static_cast<short>(read_16bit_register(REG_TEMP_HIGH_LIMIT)) * TMP_PER_BIT;
 }
 
 void TMP117::set_offset_temperature(const float offset)
 {
-    uint16_t offset_steps = roundf(offset / TMP_PER_BIT);
+    MBED_ASSERT(offset >= MIN_TEMPERATURE); // TODO: verify
+    MBED_ASSERT(offset <= MAX_TEMPERATURE);
 
-    MBED_ASSERT(offset_steps >= -256); // TODO: verify
-    MBED_ASSERT(offset_steps >= 256);
+    short offset_steps = roundf(offset / TMP_PER_BIT);
 
     write_16bit_register(REG_TEMP_OFFSET, offset_steps);
+    wait_ready();
 }
 
 float TMP117::get_offset_temperature()
@@ -130,33 +138,16 @@ float TMP117::get_offset_temperature()
     return read_16bit_register(REG_TEMP_OFFSET) * TMP_PER_BIT;
 }
 
-void TMP117::wait_ready()
-{
-    while(is_busy()) {}
-}
-
-bool TMP117::is_busy()
-{
-    return static_cast<bool>(read_value(_eeprom_busy_mask));
-}
-
 void TMP117::set_alert_mode()
 {
     write_value(_alert_mode_sel, ALERT_MODE_ALERT);
-    while(is_busy())
-    {
-        printf("waiting...\n");
-    }
+    wait_ready();
 }
 
 void TMP117::set_therm_mode()
 {
     write_value(_alert_mode_sel, ALERT_MODE_THERM);
-    while (is_busy())
-    {
-        printf(".");
-    }
-    printf("\n");
+    wait_ready();
 }
 
 TMP117::ALERT_MODE TMP117::get_alert_mode()
@@ -164,20 +155,17 @@ TMP117::ALERT_MODE TMP117::get_alert_mode()
     return (ALERT_MODE)read_value(_alert_mode_sel);
 }
 
-void TMP117::set_output_pin_mode(OUTPUT_PIN_MODE mode)
-{
-    write_value(_alert_pin_sel_mask, mode);
-}
-
 void TMP117::soft_reset()
 {
+    printf("TMP117::%s\n", __func__);
     write_value(_soft_reset_mask, SOFT_RESET);
     wait_ready(); // may take up to 2ms
 }
 
-void TMP117::set_output_pin_polarity(OUTPUT_PIN_POLARITY polarity)
+void TMP117::i2c_reset()
 {
-    write_value(_alert_pin_pol_mask, polarity);
+    char reset = I2C_RESET;
+    write_register(0x00, &reset, 1);
 }
 
 TMP117::OUTPUT_PIN_POLARITY TMP117::get_alert_pin_polarity()
@@ -192,25 +180,51 @@ uint16_t TMP117::get_device_id()
 
 uint8_t TMP117::get_device_revision()
 {
-    return (uint8_t)(read_value(_device_rev_mask));
+    return static_cast<uint8_t>(read_value(_device_rev_mask));
+}
+
+// Private
+
+void TMP117::set_output_pin_mode(OUTPUT_PIN_MODE mode)
+{
+    write_value(_alert_pin_sel_mask, mode);
+    wait_ready();
+}
+
+void TMP117::set_output_pin_polarity(OUTPUT_PIN_POLARITY polarity)
+{
+    write_value(_alert_pin_pol_mask, polarity);
+    wait_ready();
+}
+
+void TMP117::wait_ready()
+{
+    while(is_busy()) {}
+}
+
+bool TMP117::is_busy()
+{
+    return static_cast<bool>(read_value(_eeprom_busy_mask));
 }
 
 void TMP117::lock_registers()
 {
+    printf("TMP117::%s\n", __func__);
     write_value(_eun_mask, EEPROM_STATE_LOCKED);
+    wait_ready();
 }
 
-uint16_t TMP117::unlock_registers()
+void TMP117::unlock_registers()
 {
-    return write_value(_eun_mask, EEPROM_STATE_UNLOCKED);
+    printf("TMP117::%s\n", __func__);
+    write_value(_eun_mask, EEPROM_STATE_UNLOCKED);
+    wait_ready();
 }
 
 bool TMP117::registers_unlocked()
 {
     return static_cast<bool>(read_value(_eun_mask));
 }
-
-// Private
 
 void TMP117::read_register(char reg, char* data, int size)
 {
@@ -257,33 +271,6 @@ void TMP117::write_16bit_register(char reg, uint16_t value)
     write_register(reg, data, 2);
 }
 
-// uint16_t TMP117::read_register_value(char reg, uint16_t bitmask)
-// {
-//     uint16_t value = read_16bit_register(reg);
-//     value &= bitmask;
-//     return value;
-// }
-
-// void TMP117::write_register_value(char reg, uint16_t value, uint16_t bitmask)
-// {
-//     uint16_t value = read_16bit_register(reg);
-//     value &= ~bitmask;
-//     write_16bit_register(reg, value);
-// }
-
-// template<typename Enum>
-// void TMP117::write_register_value(Element<Enum>& cycle, uint16_t value)
-// {
-//     uint16_t value = read_16bit_register(cycle.name);
-//     uint16_t bitmask = 0;
-//     for (uint16_t i = 0; i < cycle.bits; ++i)
-//     {
-//         bitmask |= (1 << (cycle.bitshift + i));
-//     }
-//     value &= ~bitmask;
-//     write_16bit_register(cycle.name, value);
-// }
-
 uint16_t TMP117::read_value(const BitValueMask& mask)
 {
     uint16_t reg_value = read_16bit_register(mask.reg);
@@ -319,7 +306,7 @@ uint16_t TMP117::write_value(const BitValueMask& mask, uint16_t value)
 
     printf("##Write register value = 0b " BYTE_PLACEHOLDER" " BYTE_PLACEHOLDER"", 
             BYTE_TO_BIN(reg_value>>8), BYTE_TO_BIN(reg_value));
-    printf("\n");
+    printf("\n\n");
 
     write_16bit_register(mask.reg, reg_value);
     return value;

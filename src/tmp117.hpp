@@ -2,7 +2,6 @@
  * @file    TMP117.hpp
  * @author  Andreas Reichle (HOREICH UG)
  * 
- * ToDo: Mutex
  */
 
 #ifndef TMP117_HPP
@@ -49,7 +48,7 @@ public:
         4             1s      1s      1s       1s     CONV_CYLCE_1_S
         5             4s      4s      4s       4s     CONV_CYCLE_4_S
         6             8s      8s      8s       8s     CONV_CYCLE_8_S
-        7             16s     16s     16s      16s    CONV_CYCLE_BITMASK
+        7             16s     16s     16s      16s    CONV_CYCLE_16_S
     */
 
     public: enum STATE
@@ -73,7 +72,7 @@ public:
         CONV_CYCLE_125_MS               = 0x01,
         CONV_CYCLE_250_MS               = 0x02,
         CONV_CYCLE_500_MS               = 0x03,
-        CONV_CYLCE_1_S                  = 0x04,
+        CONV_CYCLE_1_S                  = 0x04,
         CONV_CYCLE_4_S                  = 0x05,
         CONV_CYCLE_8_S                  = 0x06,
         CONV_CYCLE_16_S                 = 0x07,
@@ -95,7 +94,7 @@ public:
 
     public: enum OUTPUT_PIN_POLARITY
     {
-        ALERT_PIN_POL_ACTIVE_LOW        = 0x00,
+        OUTPUT_PIN_POL_ACTIVE_LOW        = 0x00,
         OUTPUT_PIN_POL_ACTIVE_HIGH      = 0x01,   
     };
 
@@ -139,17 +138,21 @@ public:
     ~TMP117() = default;
 
     /**
-     * @brief           
+     * @brief           Configures the output alert pin and callback
+     * @param mode      Pin represents either therm oder alert mode
+     * @param polarity  Pin either signals low oder high
+     * @param cb        Callback to be called in case of falling or rising edge
+     * @param alert_pin Pin number at MCU      
      */
     void set_output_pin_interrupt(
         OUTPUT_PIN_MODE mode,
         OUTPUT_PIN_POLARITY polarity,
-        mbed::Callback<void()>& cb,
+        mbed::Callback<void()> cb,
         PinName alert_pin = MBED_CONF_TMP117_OUTPUT_PIN);
 
     /**
-     * @brief           configures the device into therm mode
-     *                  The alert flag is cleared when the temp drops below low temp limit after exceeding high limit once (hysterese mode)
+     * @brief           In therm mode the alert flag is cleared when the temp drops below the low
+     *                  temp limit after exceeding the high limit once (functions as a hysterese)
      * @return          void
      */
     void set_therm_mode(void);
@@ -171,22 +174,19 @@ public:
      * @brief           Reads out high and low alert flags als well as data ready flag
      * @return          states of the flags during last conversion cycle
      */
-    STATE get_conversion_info(void);
+    STATE get_conversion_state(void);
+
+    
 
     /**
-     * @brief           Selects the ALERT pin to either function as data ready or alert output
-     * @param mode      PIN_SEL_ALERT_OUTPUT: pin reflects status of alert flag
-     *                  PIN_SEL_DATA_READY_OUTPUT: pin reflects status of data ready flag
-     * @return          void          
-     */
-    void set_output_pin_mode(OUTPUT_PIN_MODE mode);
-
-    /**
-     * @brief           Runs the power-on reset sequence
-     *                  During reset default values are written to all the registers (may take up to 1.5ms)
+     * @brief           During reset default values are written to all registers (may take up to 1.5ms);
+     *                  after reset all registeres are locked
      * @return          void
      */
     void soft_reset(void);
+
+    void i2c_reset();
+
 
     /**
      * @brief           Sets the offset temperature for custom system calibration
@@ -194,13 +194,6 @@ public:
      * @return          void
      */
     void set_offset_temperature(float offset);
-
-    /**
-     * @brief           Polarity (high or low) of alert/output pin
-     * @param polarity  high or low polarity
-     * @return          void
-     */
-    void set_output_pin_polarity(OUTPUT_PIN_POLARITY polarity);
 
     /**
      * @brief           Returns the current polarity of the alert/output pin
@@ -221,7 +214,7 @@ public:
     uint16_t get_device_address(void);
 
     /**
-     * @brief           Reads the last temperature measurement
+     * @brief           Reads the last temperature measurement; also clears the data_ready flag in the config register
      * @return          Current temperature measurement
      */
     float read_temperature(void);
@@ -238,37 +231,25 @@ public:
      */
     uint8_t get_device_revision(void);
 
-    /**
-     * @brief           Locks the eeprom so data can be programmed to the EEPROM
-     * @return          void
-     */
-    void lock_registers();
+
+
+   
 
     /**
-     * @brief           Unlocks the eeprom so data can be programmed to the EEPROM
-     * @return          void
-     */
-    uint16_t unlock_registers(void);
-
-    bool registers_unlocked();
-
-    /**
-     * @brief           Forces the device into shut down mode (250nA QC)
+     * @brief           Forces the device into shut down mode (250nA QC); it is the default mode
      * @return          void
      */
     void shut_down(void);
 
     /**
-     * @brief           Sets the continouous conversion mode
-     *                  Device performs continuous measurements and goes to sleep in between
-     *                  Conversion cycle depends on averaging mode
+     * @brief           Makes the device to perform continuous measurements with short sleep cycles in between;
+     *                  the duration of the measurement cycle depends on the selected averaging mode
      * @return          void
      */
     void set_continuous_conversion_mode(void);
 
     /**
-     * @brief           Sets the one-shot conversion mode
-     *                  Device shuts down after one conversion
+     * @brief           In one-shot conversion mode the device shuts down after performing a single conversion
      * @return          void
      */
     void set_oneshot_conversion_mode(void);
@@ -282,7 +263,7 @@ public:
 
     /**
      * @brief           Sets the averaging mode
-     * @param mode      The averaging mode to be set
+     * @param mode      The averaging mode to be set (AVG_MODE)
      * @return          void
      */
     void set_averaging_mode(AVG_MODE mode);
@@ -295,13 +276,16 @@ public:
 
     /**
      * @brief           Sets the standby time between conversion cycles (see table)
-     * @param           Conversion cycle time
+     * @param cycle     Conversion cycle time
      * @return          void
      *                  
      */
     void set_conversion_cycle_time(CONV_CYCLE cylce);
 
-    
+    /**
+     * @brief           Returns the current conversion cycle time
+     * @return          Conversion cycle time as enum
+     */
     CONV_CYCLE get_conversion_cycle_time();
 
     /**
@@ -312,15 +296,46 @@ public:
      */
     void set_alert_limits(const float lower_limit, const float upper_limit);
 
+    /**
+     * 
+     */
     void get_alert_limits(float& lower_limit, float& upper_limit);
-
-    // TODO: hard_reset
 
 private:
 
     /**
-     * @brief TODO timer
+     * @brief           Selects the ALERT pin to either function as data ready or alert output
+     * @param mode      OUTPUT_PIN_MODE: pin reflects status of alert flag
+     *                  or pin reflects status of data ready flag
+     * @return          void          
      */
+    void set_output_pin_mode(OUTPUT_PIN_MODE mode);
+
+    /**
+     * @brief           Polarity (high or low) of alert/output pin
+     * @param polarity  high or low polarity
+     * @return          void
+     */
+    void set_output_pin_polarity(OUTPUT_PIN_POLARITY polarity);
+
+    /**
+     * @brief           Locks the EEPROM so data cannot be programmed to the EEPROM
+     * @return          void
+     */
+    void lock_registers(void);
+
+    /**
+     * @brief           Unlocks the EEPROM so data can be programmed to the EEPROM
+     * @return          void
+     */
+    void unlock_registers(void);
+
+    /**
+     * @brief           Returns whether EEPROM is unlocked or not
+     * @return          true if unlocked, false if locked
+     */
+    bool registers_unlocked();
+
     void wait_ready();
 
     bool is_busy(void);
@@ -338,27 +353,22 @@ private:
     void write_16bit_register(char reg, uint16_t value);
     uint16_t read_16bit_register(char reg);
 
-    // Deprecated
-    // void write_register_value(char reg, uint16_t value, uint16_t bitmask);
-    // uint16_t read_register_value(char reg, uint16_t bitmask);
-
-    // Deprecated
-    //template<class Enum>
-    //void write_register_value(Element<Enum>& cycle, uint16_t value);
-
     uint16_t write_value(const BitValueMask& mask, uint16_t value);
     uint16_t read_value(const BitValueMask& mask);
 
 private:
 
-    mbed::I2C _i2c;                                     // <I2C interface>
-    std::unique_ptr<mbed::InterruptIn> _isr;
+    mbed::I2C _i2c;                                                     // <I2C interface>
+    std::unique_ptr<mbed::InterruptIn> _isr;                            // <alert pin interrupt>
 
-    static constexpr float TMP_PER_BIT = 0.0078125f;    // <Temperature in K per bit>
-    static constexpr uint16_t DEVICE_ADDRESS = 0x90;    // <Device I2C address>
+    static constexpr float TMP_PER_BIT                 = 0.0078125f;    // <temperature step in K per bit (256.0 / 32768)>
+    static constexpr float MAX_TEMPERATURE             = 255.9921f;     // <maximum temperature (0b0111 1111 1111 1111 * 0.0078125f)>
+    static constexpr float MIN_TEMPERATURE             = -256.0f;       // <minimum temperature (0x1000 0000 0000 0000 * 0.0078125f)>
+    static constexpr uint16_t DEVICE_ADDRESS           = 0x90;          // <device I2C address>
 
     static constexpr uint16_t EEPROM_STATE_BUSY        = 0x01;
     static constexpr uint16_t SOFT_RESET               = 0x01;
+    static constexpr uint8_t I2C_RESET                 = 0x06;
 
     static constexpr uint16_t REG_TEMP                 = 0x00;
     static constexpr uint16_t REG_CONFIG               = 0x01;
@@ -372,7 +382,7 @@ private:
     static constexpr uint16_t REG_DEVICE_ID            = 0x0F;
     
     // CONFIGURATION REGISTER (0x01)
-    const BitValueMask _conv_info_mask      {REG_CONFIG, 3, 13};
+    const BitValueMask _conv_state_mask     {REG_CONFIG, 3, 13};
     const BitValueMask _conv_mode_mask      {REG_CONFIG, 2, 10};
     const BitValueMask _conv_cycle_mask     {REG_CONFIG, 3, 7 };
     const BitValueMask _avg_mask            {REG_CONFIG, 2, 5 };

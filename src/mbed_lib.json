@@ -11,11 +11,7 @@
         },
         "output-pin": {
             "help": "configurable altert/data ready pin",
-            "value": "PC_7"
-        },
-        "enable-debug-mode": {
-            "help": "enable debug mode",
-            "value": true
+            "value": "PC_9"
         },
         "frequency":
         {

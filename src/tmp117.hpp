@@ -1,7 +1,9 @@
 /**
  * @file    TMP117.hpp
  * @author  Andreas Reichle (HOREICH UG)
- * 
+ * @TODO:   
+ * - Check i2c locks
+ * - 8bit bitshift value instead of 16bit
  */
 
 #ifndef TMP117_HPP
@@ -112,22 +114,13 @@ public:
 
 private:
 
-    //template<typename Enum>
-    class BitValueMask
+    struct BitValueMask
     {
-        public:
-
-        //template<typename Enum>
-        BitValueMask(uint16_t r, uint16_t b, uint16_t bs) : reg(r), bits(b), bitshift(bs) {};
-        
+        BitValueMask(uint16_t r, uint16_t b, uint16_t bs) : reg(r), bits(b), bitshift(bs) {};    
         uint16_t reg;
         uint16_t bits;
         uint16_t bitshift;
-        //Enum values;
     };
-
-    // Element<CONV_CYCLE>* _conversionCycle = new Element<CONV_CYCLE>(convCycle, TMP117_REG_CONFIG, 3, 9);
-    // Element<CONVERSION_MODE>* _conversionMode = new Element<CONVERSION_MODE>(convMode, TMP117_REG_CONFIG, 2, 10);
 
 public:
 
@@ -359,7 +352,7 @@ private:
 private:
 
     mbed::I2C _i2c;                                                     // <I2C interface>
-    std::unique_ptr<mbed::InterruptIn> _isr;                            // <alert pin interrupt>
+    std::unique_ptr<mbed::InterruptIn> _isr;                            // <alert interrupt pin>
 
     static constexpr float TMP_PER_BIT                 = 0.0078125f;    // <temperature step in K per bit (256.0 / 32768)>
     static constexpr float MAX_TEMPERATURE             = 255.9921f;     // <maximum temperature (0b0111 1111 1111 1111 * 0.0078125f)>

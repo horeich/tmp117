@@ -1,5 +1,5 @@
 {
-    "name": "TMP117",
+    "name": "tmp117",
     "config": {
         "sda-pin": {
             "help": "the SDA pin of the I2C communication",

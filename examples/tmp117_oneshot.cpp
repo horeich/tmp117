@@ -3,15 +3,16 @@
  * @author  Andreas Reichle (HOREICH UG)
  */
 
-#define TMP117_CALLBACK
-
 #include "tmp117_oneshot.hpp"
 
 using namespace std::chrono_literals;
 using namespace mbed;
 
 DigitalOut TMP117_OneShot::_led(PA_5, 0); // configured for NUCLEO-L476RG
+
+#ifdef TMP117_CALLBACK
 EventFlags TMP117_OneShot::_data_ready;
+#endif
 
 #ifdef TMP117_CALLBACK
 void TMP117_OneShot::SignalDataReady()
@@ -25,6 +26,7 @@ void TMP117_OneShot::Run()
 {
     printf("### One-shot mode example ###\n");
 
+    // Configure pins in mbed_lib.json
     TMP117 tmp117;
 
     // Reset standard config

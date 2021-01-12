@@ -1,6 +1,9 @@
 /**
  * @file    TMP117.cpp
  * @author  Andreas Reichle (HOREICH UG)
+ * TODO:
+ * - interrupt pin pullup/pulldown fix?
+ * - Add locks to i2c connection
  */
 
 #include "tmp117.hpp"
@@ -40,21 +43,25 @@ void TMP117::set_output_pin_interrupt(
 
 float TMP117::read_temperature()
 {
+    printf("TMP117::%s\n", __func__);
     return static_cast<short>(read_16bit_register(REG_TEMP)) * TMP_PER_BIT;
 }
 
 TMP117::STATE TMP117::get_conversion_state()
 {
+    printf("TMP117::%s\n", __func__);
     return (STATE)read_value(_conv_state_mask);
 }
 
 uint16_t TMP117::get_device_address()
 {
+    printf("TMP117::%s\n", __func__);
     return DEVICE_ADDRESS;
 }
 
 void TMP117::shut_down()
 {
+    printf("TMP117::%s\n", __func__);
     write_value(_conv_mode_mask, CONVERSION_MODE_SHUTDOWN);
 }
 
@@ -74,6 +81,7 @@ void TMP117::set_oneshot_conversion_mode()
 
 TMP117::CONVERSION_MODE TMP117::get_conversion_mode()
 {
+    printf("TMP117::%s\n", __func__);
     return static_cast<CONVERSION_MODE>(read_value(_conv_mode_mask));
 }
 
@@ -86,6 +94,7 @@ void TMP117::set_conversion_cycle_time(CONV_CYCLE cycle)
 
 TMP117::CONV_CYCLE TMP117::get_conversion_cycle_time()
 {
+    printf("TMP117::%s\n", __func__);
     return static_cast<CONV_CYCLE>(read_value(_conv_cycle_mask));
 }
 
@@ -98,6 +107,7 @@ void TMP117::set_averaging_mode(AVG_MODE mode)
 
 TMP117::AVG_MODE TMP117::get_averaging_mode()
 {
+    printf("TMP117::%s\n", __func__);
     return static_cast<AVG_MODE>(read_value(_avg_mask));
 }
 
@@ -135,17 +145,20 @@ void TMP117::set_offset_temperature(const float offset)
 
 float TMP117::get_offset_temperature()
 {   
+    printf("TMP117::%s\n", __func__);
     return read_16bit_register(REG_TEMP_OFFSET) * TMP_PER_BIT;
 }
 
 void TMP117::set_alert_mode()
 {
+    printf("TMP117::%s\n", __func__);
     write_value(_alert_mode_sel, ALERT_MODE_ALERT);
     wait_ready();
 }
 
 void TMP117::set_therm_mode()
 {
+    printf("TMP117::%s\n", __func__);
     write_value(_alert_mode_sel, ALERT_MODE_THERM);
     wait_ready();
 }
@@ -219,6 +232,7 @@ void TMP117::set_output_pin_polarity(OUTPUT_PIN_POLARITY polarity)
 
 void TMP117::wait_ready()
 {
+    printf("TMP117::%s\n", __func__);
     while(is_busy()) {}
 }
 
@@ -274,10 +288,10 @@ void TMP117::write_16bit_register(char reg, uint16_t value)
 
 uint16_t TMP117::read_value(const BitValueMask& mask)
 {
-    uint16_t reg_value = read_16bit_register(mask.reg);
+    uint16_t value = read_16bit_register(mask.reg);
 
-    printf("##Read register value = 0b " BYTE_PLACEHOLDER" " BYTE_PLACEHOLDER"", 
-            BYTE_TO_BIN(reg_value>>8), BYTE_TO_BIN(reg_value));
+    printf("##Read 0b " BYTE_PLACEHOLDER" " BYTE_PLACEHOLDER"", 
+            BYTE_TO_BIN(value>>8), BYTE_TO_BIN(value));
     printf("\n");
 
     uint16_t bitmask{0};
@@ -285,12 +299,12 @@ uint16_t TMP117::read_value(const BitValueMask& mask)
     {
         bitmask |= (1 << (mask.bitshift + i));
     }
-    reg_value &= bitmask;
-    reg_value >>= mask.bitshift;
+    value &= bitmask;
+    value >>= mask.bitshift;
 
-    printf("Return value = %d\n\n", reg_value);
+    printf("Value = %d\n\n", value);
 
-    return reg_value;
+    return value;
 }
 
 uint16_t TMP117::write_value(const BitValueMask& mask, uint16_t value)
@@ -305,10 +319,11 @@ uint16_t TMP117::write_value(const BitValueMask& mask, uint16_t value)
     reg_value &= ~bitmask;
     reg_value |= value;
 
-    printf("##Write register value = 0b " BYTE_PLACEHOLDER" " BYTE_PLACEHOLDER"", 
-            BYTE_TO_BIN(reg_value>>8), BYTE_TO_BIN(reg_value));
-    printf("\n\n");
-
     write_16bit_register(mask.reg, reg_value);
+    
+    printf("##Wrote 0b " BYTE_PLACEHOLDER" " BYTE_PLACEHOLDER"", 
+            BYTE_TO_BIN(reg_value>>8), BYTE_TO_BIN(reg_value));
+    printf("\n");
+
     return value;
 }

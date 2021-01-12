@@ -7,6 +7,8 @@
 #include "mbed.h"
 #include "rtos.h"
 
+// #define TMP117_CALLBACK
+
 class TMP117_Continuous
 {
 public:
@@ -22,5 +24,8 @@ private:
 private:
 
     static mbed::DigitalOut Led;
+
+#ifdef TMP117_CALLBACK
     static rtos::EventFlags DataReady;
+#endif
 };

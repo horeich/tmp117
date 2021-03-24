@@ -8,6 +8,8 @@
 
 #include "tmp117.hpp"
 
+#define TRACE_GROUP "TMP1"
+
 TMP117::TMP117(PinName sda, PinName scl, uint32_t frequency) :
     _i2c(sda, scl)
 {
@@ -15,99 +17,101 @@ TMP117::TMP117(PinName sda, PinName scl, uint32_t frequency) :
 }
 
 void TMP117::set_output_pin_interrupt(
-    OUTPUT_PIN_MODE mode, 
+    mbed::Callback<void()> callback, 
+    OUTPUT_PIN_MODE output_mode, 
     OUTPUT_PIN_POLARITY polarity, 
-    mbed::Callback<void()> cb, 
+    PinMode pin_mode,
     PinName output_pin)
 {
-    printf("TMP117::%s\n", __func__);
-    if (cb)
+    debug_print("TMP117::%s\n", __func__);
+    if (callback)
     {
-        set_output_pin_mode(mode);
+        set_output_pin_mode(output_mode);
         set_output_pin_polarity(polarity);
-        _isr = std::make_unique<mbed::InterruptIn>(output_pin, PinMode::PullNone);
+        _isr = std::make_unique<mbed::InterruptIn>(output_pin, pin_mode);
         if (polarity == OUTPUT_PIN_POL_ACTIVE_HIGH)
         {
-            _isr->rise(cb);
+            _isr->rise(callback);
         }
         else
         {
-            _isr->fall(cb);
+            _isr->fall(callback);
         }
     }
     else
     {
         _isr.reset();
+        // TODO: low power pin mode analog in?
     }
 }
 
 float TMP117::read_temperature()
 {
-    printf("TMP117::%s\n", __func__);
+    debug_print("TMP117::%s\n", __func__);
     return static_cast<short>(read_16bit_register(REG_TEMP)) * TMP_PER_BIT;
 }
 
 TMP117::STATE TMP117::get_conversion_state()
 {
-    printf("TMP117::%s\n", __func__);
+    debug_print("TMP117::%s\n", __func__);
     return (STATE)read_value(_conv_state_mask);
 }
 
 uint16_t TMP117::get_device_address()
 {
-    printf("TMP117::%s\n", __func__);
+    debug_print("TMP117::%s\n", __func__);
     return DEVICE_ADDRESS;
 }
 
 void TMP117::shut_down()
 {
-    printf("TMP117::%s\n", __func__);
+    debug_print("TMP117::%s\n", __func__);
     write_value(_conv_mode_mask, CONVERSION_MODE_SHUTDOWN);
 }
 
 void TMP117::set_continuous_conversion_mode()
 {
-    printf("TMP117::%s\n", __func__);
+    debug_print("TMP117::%s\n", __func__);
     write_value(_conv_mode_mask, CONVERSION_MODE_CONTINUOUS);
     wait_ready();
 }
 
 void TMP117::set_oneshot_conversion_mode()
 {
-    printf("TMP117::%s\n", __func__);
+    debug_print("TMP117::%s\n", __func__);
     write_value(_conv_mode_mask, CONVERSION_MODE_ONESHOT);
     //wait_ready();
 }
 
 TMP117::CONVERSION_MODE TMP117::get_conversion_mode()
 {
-    printf("TMP117::%s\n", __func__);
+    debug_print("TMP117::%s\n", __func__);
     return static_cast<CONVERSION_MODE>(read_value(_conv_mode_mask));
 }
 
 void TMP117::set_conversion_cycle_time(CONV_CYCLE cycle)
 {
-    printf("TMP117::%s\n", __func__);
+    debug_print("TMP117::%s\n", __func__);
     write_value(_conv_cycle_mask, cycle);
     wait_ready();
 }
 
 TMP117::CONV_CYCLE TMP117::get_conversion_cycle_time()
 {
-    printf("TMP117::%s\n", __func__);
+    debug_print("TMP117::%s\n", __func__);
     return static_cast<CONV_CYCLE>(read_value(_conv_cycle_mask));
 }
 
 void TMP117::set_averaging_mode(AVG_MODE mode)
 {
-    printf("TMP117::%s\n", __func__);
+    debug_print("TMP117::%s\n", __func__);
     write_value(_avg_mask, mode);
     wait_ready();
 }
 
 TMP117::AVG_MODE TMP117::get_averaging_mode()
 {
-    printf("TMP117::%s\n", __func__);
+    debug_print("TMP117::%s\n", __func__);
     return static_cast<AVG_MODE>(read_value(_avg_mask));
 }
 
@@ -145,20 +149,20 @@ void TMP117::set_offset_temperature(const float offset)
 
 float TMP117::get_offset_temperature()
 {   
-    printf("TMP117::%s\n", __func__);
+    debug_print("TMP117::%s\n", __func__);
     return read_16bit_register(REG_TEMP_OFFSET) * TMP_PER_BIT;
 }
 
 void TMP117::set_alert_mode()
 {
-    printf("TMP117::%s\n", __func__);
+    debug_print("TMP117::%s\n", __func__);
     write_value(_alert_mode_sel, ALERT_MODE_ALERT);
     wait_ready();
 }
 
 void TMP117::set_therm_mode()
 {
-    printf("TMP117::%s\n", __func__);
+    debug_print("TMP117::%s\n", __func__);
     write_value(_alert_mode_sel, ALERT_MODE_THERM);
     wait_ready();
 }
@@ -170,7 +174,7 @@ TMP117::ALERT_MODE TMP117::get_alert_mode()
 
 void TMP117::soft_reset()
 {
-    printf("TMP117::%s\n", __func__);
+    debug_print("TMP117::%s\n", __func__);
     write_value(_soft_reset_mask, SOFT_RESET);
     wait_ready(); // may take up to 2ms
 }
@@ -199,14 +203,14 @@ uint8_t TMP117::get_device_revision()
 
 void TMP117::lock_registers()
 {
-    printf("TMP117::%s\n", __func__);
+    debug_print("TMP117::%s\n", __func__);
     write_value(_eun_mask, EEPROM_STATE_LOCKED);
     wait_ready();
 }
 
 void TMP117::unlock_registers()
 {
-    printf("TMP117::%s\n", __func__);
+    debug_print("TMP117::%s\n", __func__);
     write_value(_eun_mask, EEPROM_STATE_UNLOCKED);
     wait_ready();
 }
@@ -232,7 +236,7 @@ void TMP117::set_output_pin_polarity(OUTPUT_PIN_POLARITY polarity)
 
 void TMP117::wait_ready()
 {
-    printf("TMP117::%s\n", __func__);
+    debug_print("TMP117::%s\n", __func__);
     while(is_busy()) {}
 }
 
@@ -290,9 +294,9 @@ uint16_t TMP117::read_value(const BitValueMask& mask)
 {
     uint16_t value = read_16bit_register(mask.reg);
 
-    printf("##Read 0b " BYTE_PLACEHOLDER" " BYTE_PLACEHOLDER"", 
+    debug_print("##Read 0b " BYTE_PLACEHOLDER" " BYTE_PLACEHOLDER"", 
             BYTE_TO_BIN(value>>8), BYTE_TO_BIN(value));
-    printf("\n");
+    debug_print("\n");
 
     uint16_t bitmask{0};
     for (uint8_t i = 0; i < mask.bits; ++i)
@@ -302,7 +306,7 @@ uint16_t TMP117::read_value(const BitValueMask& mask)
     value &= bitmask;
     value >>= mask.bitshift;
 
-    printf("Value = %d\n\n", value);
+    debug_print("Value = %d\n\n", value);
 
     return value;
 }
@@ -321,9 +325,9 @@ uint16_t TMP117::write_value(const BitValueMask& mask, uint16_t value)
 
     write_16bit_register(mask.reg, reg_value);
     
-    printf("##Wrote 0b " BYTE_PLACEHOLDER" " BYTE_PLACEHOLDER"", 
+    debug_print("##Wrote 0b " BYTE_PLACEHOLDER" " BYTE_PLACEHOLDER"", 
             BYTE_TO_BIN(reg_value>>8), BYTE_TO_BIN(reg_value));
-    printf("\n");
+    debug_print("\n");
 
     return value;
 }

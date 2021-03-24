@@ -35,10 +35,10 @@ void TMP117_OneShot::Run()
     #ifdef TMP117_CALLBACK
     // Configure as data ready pin with high on alert
     tmp117.set_output_pin_interrupt(
+        mbed::callback(SignalDataReady),
         TMP117::OUTPUT_PIN_MODE_DATA_READY,
         TMP117::OUTPUT_PIN_POL_ACTIVE_HIGH,
-        mbed::callback(SignalDataReady)
-    );
+        PinMode::PullNone);
     #endif
 
     // Setup conversion cycle time and averaging mode
@@ -66,6 +66,10 @@ void TMP117_OneShot::Run()
         // Sleep for a while
         rtos::ThisThread::sleep_for(3s);
     }
+
+    #ifdef TMP117_CALLBACK
+    tmp117.set_output_pin_interrupt(nullptr);
+    #endif
 
     tmp117.shut_down();
 }

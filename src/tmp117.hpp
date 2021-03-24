@@ -9,6 +9,17 @@
 #ifndef TMP117_HPP
 #define TMP117_HPP
 
+#include "drivers/I2C.h"
+#include "drivers/InterruptIn.h"
+#include "platform/Callback.h"
+#include "mbed_error.h"
+#include <math.h>
+#include <memory>
+
+// Enable for debug print output
+#define MBED_CONF_TMP117_ENABLE_DEBUG_MODE 0
+
+#ifdef MBED_CONF_TMP117_ENABLE_DEBUG_MODE == 1
 #define BYTE_PLACEHOLDER "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BIN(byte) \
   (byte & 0x80 ? '1' : '0'), \
@@ -20,25 +31,15 @@
   (byte & 0x02 ? '1' : '0'), \
   (byte & 0x01 ? '1' : '0') 
 
-#include "drivers/I2C.h"
-#include "drivers/InterruptIn.h"
-#include "platform/Callback.h"
-#include "mbed_error.h"
-#include <math.h>
-#include <memory>
-
-#ifdef MBED_CONF_TMP117_ENABLE_DEBUG_MODE
+#define debug_print(...)      printf(__VA_ARGS__)
+#else
+#define debug_print(...)   
 #endif
 
 class TMP117
 {
 
 public:
-
-    enum CONVERSION_TIME
-    {
-        CONVERSION_TIME
-    };
 
     /*  Conversion Cycle Time in CC Mode
               AVG       0       1       2       3
@@ -137,11 +138,31 @@ public:
      * @param cb        Callback to be called in case of falling or rising edge
      * @param alert_pin Pin number at MCU      
      */
+
+
+    /**
+     * @brief           
+     * @param mode      
+     * @param polarity  
+     * @param cb        
+     * @param alert_pin Pin number at MCU      
+     */
+
+    /**
+     * @brief                   Configures the output alert pin and callback
+     * 
+     * @param callback          Callback to be called in case of falling or rising edge 
+     * @param output_pin        Pin number at MCU 
+     * @param output_mode       Pin represents either therm oder alert mode
+     * @param polarity          Pin either signals low oder high 
+     * @param pin_mode          Use internal pull-up/ pull-down or none
+     */
     void set_output_pin_interrupt(
-        OUTPUT_PIN_MODE mode,
-        OUTPUT_PIN_POLARITY polarity,
-        mbed::Callback<void()> cb,
-        PinName alert_pin = MBED_CONF_TMP117_OUTPUT_PIN);
+        mbed::Callback<void()> callback, 
+        OUTPUT_PIN_MODE output_mode = OUTPUT_PIN_MODE_DATA_READY, 
+        OUTPUT_PIN_POLARITY polarity = OUTPUT_PIN_POL_ACTIVE_LOW, 
+        PinMode pin_mode = PinMode::PullNone,
+        PinName output_pin = MBED_CONF_TMP117_OUTPUT_PIN);
 
     /**
      * @brief           In therm mode the alert flag is cleared when the temp drops below the low

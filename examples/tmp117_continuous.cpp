@@ -34,9 +34,10 @@ void TMP117_Continuous::Run()
     #ifdef TMP117_CALLBACK
     // Configure as data ready pin with low on alert
     tmp117.set_output_pin_interrupt(
+        mbed::callback(SignalDataReady),
         TMP117::OUTPUT_PIN_MODE_DATA_READY,
         TMP117::OUTPUT_PIN_POL_ACTIVE_LOW,
-        mbed::callback(SignalDataReady)
+        PinMode::PullNone
     );
     #endif
 
@@ -60,6 +61,10 @@ void TMP117_Continuous::Run()
         // Read conversion result
         printf("Temperature [°C] = %.4f\n", tmp117.read_temperature());
     }
+
+    #ifdef TMP117_CALLBACK
+    tmp117.set_output_pin_interrupt(nullptr);
+    #endif
 
     tmp117.shut_down();
 }

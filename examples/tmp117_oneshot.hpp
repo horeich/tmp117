@@ -7,7 +7,7 @@
 #include "mbed.h"
 #include "rtos.h"
 
-// #define TMP117_CALLBACK
+#define TMP117_CALLBACK
 
 class TMP117_OneShot
 {

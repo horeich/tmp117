@@ -11,6 +11,7 @@
 
 #include "drivers/I2C.h"
 #include "drivers/InterruptIn.h"
+#include "drivers/DigitalInOut.h"
 #include "platform/Callback.h"
 #include "mbed_error.h"
 #include <math.h>
@@ -18,23 +19,6 @@
 
 // Enable for debug print output
 #define MBED_CONF_TMP117_ENABLE_DEBUG_MODE 0
-
-#ifdef MBED_CONF_TMP117_ENABLE_DEBUG_MODE == 1
-#define BYTE_PLACEHOLDER "%c%c%c%c%c%c%c%c"
-#define BYTE_TO_BIN(byte) \
-  (byte & 0x80 ? '1' : '0'), \
-  (byte & 0x40 ? '1' : '0'), \
-  (byte & 0x20 ? '1' : '0'), \
-  (byte & 0x10 ? '1' : '0'), \
-  (byte & 0x08 ? '1' : '0'), \
-  (byte & 0x04 ? '1' : '0'), \
-  (byte & 0x02 ? '1' : '0'), \
-  (byte & 0x01 ? '1' : '0') 
-
-#define debug_print(...)      printf(__VA_ARGS__)
-#else
-#define debug_print(...)   
-#endif
 
 class TMP117
 {
@@ -132,23 +116,6 @@ public:
     ~TMP117() = default;
 
     /**
-     * @brief           Configures the output alert pin and callback
-     * @param mode      Pin represents either therm oder alert mode
-     * @param polarity  Pin either signals low oder high
-     * @param cb        Callback to be called in case of falling or rising edge
-     * @param alert_pin Pin number at MCU      
-     */
-
-
-    /**
-     * @brief           
-     * @param mode      
-     * @param polarity  
-     * @param cb        
-     * @param alert_pin Pin number at MCU      
-     */
-
-    /**
      * @brief                   Configures the output alert pin and callback
      * 
      * @param callback          Callback to be called in case of falling or rising edge 
@@ -163,6 +130,10 @@ public:
         OUTPUT_PIN_POLARITY polarity = OUTPUT_PIN_POL_ACTIVE_LOW, 
         PinMode pin_mode = PinMode::PullNone,
         PinName output_pin = MBED_CONF_TMP117_OUTPUT_PIN);
+
+    void enable();
+
+    void disable();
 
     /**
      * @brief           In therm mode the alert flag is cleared when the temp drops below the low
@@ -372,8 +343,14 @@ private:
 
 private:
 
-    mbed::I2C _i2c;                                                     // <I2C interface>
+    PinName _sda_pin;
+    PinName _scl_pin;
+    uint32_t _frequency;
+    std::unique_ptr<mbed::I2C> _i2c;                                    // <I2C interface>
+    std::unique_ptr<mbed::DigitalInOut> _sda;
+    std::unique_ptr<mbed::DigitalInOut> _scl;
     std::unique_ptr<mbed::InterruptIn> _isr;                            // <alert interrupt pin>
+    std::unique_ptr<mbed::DigitalInOut> _isr_idle;
 
     static constexpr float TMP_PER_BIT                 = 0.0078125f;    // <temperature step in K per bit (256.0 / 32768)>
     static constexpr float MAX_TEMPERATURE             = 255.9921f;     // <maximum temperature (0b0111 1111 1111 1111 * 0.0078125f)>
